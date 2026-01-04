@@ -1,0 +1,127 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================
+// FOCUS TIMER APP SCHEMA
+// Replaces old Resource/StudyLog models
+// ============================================
+
+model User {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  name      String?
+  username  String?     @unique
+  image     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  sessions  Session[]
+  awards    UserAward[]
+  stats     UserStats?
+}
+
+// ============================================
+// SESSION TRACKING
+// ============================================
+
+enum SessionType {
+  TIMER   // Single-task timer session
+  BENTO   // Part of a 3-task Focus Box session
+  ROUTINE // Scheduled routine session (future)
+}
+
+model Session {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type            SessionType
+  taskName        String      @default("Focus Session")
+  
+  // Duration in seconds
+  durationPlanned Int
+  durationActual  Int
+  
+  // Focus tracking
+  pauseCount      Int         @default(0)
+  focusScore      Int         // 0-100
+  
+  // Bento session grouping (only for type: BENTO)
+  bentoSessionId  String?     // Groups 3 tasks together
+  bentoTaskIndex  Int?        // 0, 1, or 2
+  
+  completedAt     DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  
+  @@index([userId, completedAt])
+  @@index([bentoSessionId])
+}
+
+// ============================================
+// AWARDS / ACHIEVEMENTS
+// ============================================
+
+enum AwardType {
+  // Focus Mastery (4 awards)
+  TASK_STARTER      // 5 sessions completed
+  PERFECT_FOCUS     // 25 perfect focus scores (100%)
+  FOCUS_CHAMPION    // 50 sessions with 90%+ focus
+  STEADY_PERFORMER  // 20 sessions between 25-45 min
+  
+  // ADHD Superpowers (4 awards)
+  TIMER_SPECIALIST  // 50 timer sessions
+  COMEBACK_CHAMPION // 5 sessions with 4+ pauses
+  ZEN_MASTER        // 20 perfect + no pauses
+  NO_PAUSE_PRO      // 30 sessions with no pauses
+  
+  // Consistency Builder (4 awards)
+  BENTO_MASTER       // 25 bento sessions
+  ROUTINE_CHAMPION   // 25 routine sessions
+  ROUTINE_BUILDER    // 30-day streak
+  PERSISTENCE_MASTER // 30 sessions with 1-3 pauses
+}
+
+model UserAward {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  awardType  AwardType
+  unlockedAt DateTime  @default(now())
+  
+  @@unique([userId, awardType])
+}
+
+// ============================================
+// USER STATISTICS (Aggregated for performance)
+// ============================================
+
+model UserStats {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Streak tracking
+  currentStreak        Int      @default(0)
+  longestStreak        Int      @default(0)
+  lastActiveDate       DateTime?
+  
+  // Totals
+  totalSessions        Int      @default(0)
+  totalFocusMinutes    Int      @default(0)
+  
+  // Special counters for awards
+  perfectScoreCount    Int      @default(0)  // Sessions with 100% score
+  noPauseSessionCount  Int      @default(0)  // Sessions with 0 pauses
+  
+  // Preferences
+  defaultDuration      Int      @default(25) // in minutes
+  defaultSound         String   @default("off")
+  
+  updatedAt            DateTime @updatedAt
+}

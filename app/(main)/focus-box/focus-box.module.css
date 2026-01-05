@@ -4,9 +4,37 @@
     padding: 24px 16px;
 }
 
+/* Desktop: larger padding */
+@media (min-width: 1024px) {
+    .page {
+        padding: 32px 24px;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .page {
+        padding: 24px 20px;
+    }
+}
+
 .container {
-    max-width: 480px;
+    max-width: 560px;
     margin: 0 auto;
+}
+
+/* Desktop: slightly larger container */
+@media (min-width: 1024px) {
+    .container {
+        max-width: 600px;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .container {
+        max-width: 520px;
+    }
 }
 
 .title {

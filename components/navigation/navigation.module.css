@@ -1,0 +1,377 @@
+/* Navigation CSS Variables */
+:root {
+    --sidebar-width-full: 200px;
+    --sidebar-width-collapsed: 64px;
+    --sidebar-right-width-full: 180px;
+    --bottom-nav-height: 72px;
+
+    /* Breakpoints reference:
+     Desktop: >= 1024px (full sidebars)
+     Tablet: 768px - 1023px (collapsed sidebars)
+     Mobile: < 768px (bottom nav + horizontal tabs)
+  */
+}
+
+/* ==================== Side Navigation (Left) ==================== */
+.sideNav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--sidebar-width-full);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(197, 201, 164, 0.3);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 12px;
+    gap: 8px;
+    z-index: 100;
+    transition: width 0.2s ease;
+}
+
+/* Tablet: collapsed sidebar */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sideNav {
+        width: var(--sidebar-width-collapsed);
+        padding: 24px 8px;
+    }
+}
+
+/* Mobile: hide side nav */
+@media (max-width: 767px) {
+    .sideNav {
+        display: none;
+    }
+}
+
+.sideNavItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: #6B6B6B;
+    text-decoration: none;
+    position: relative;
+    transition: color 0.15s ease;
+}
+
+.sideNavItem:hover {
+    color: #3A3A3A;
+}
+
+.sideNavItemActive {
+    color: #3A3A3A;
+}
+
+.sideNavIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sideNavItemActive .sideNavIcon {
+    color: #7A6052;
+}
+
+.sideNavLabel {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Hide labels on tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sideNavItem {
+        padding: 12px;
+        justify-content: center;
+    }
+
+    .sideNavLabel {
+        display: none;
+    }
+}
+
+.activeIndicator {
+    position: absolute;
+    inset: 0;
+    background: rgba(197, 201, 164, 0.25);
+    border-radius: 12px;
+    z-index: -1;
+}
+
+/* Tooltip for collapsed mode */
+.tooltip {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #3A3A3A;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.tooltip::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-right-color: #3A3A3A;
+}
+
+/* Show tooltip on hover in collapsed mode */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sideNavItem:hover .tooltip {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+/* ==================== Right Sidebar ==================== */
+.rightSidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: var(--sidebar-right-width-full);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(197, 201, 164, 0.3);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 12px;
+    gap: 8px;
+    z-index: 100;
+    transition: width 0.2s ease;
+}
+
+/* Tablet: collapsed right sidebar */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .rightSidebar {
+        width: var(--sidebar-width-collapsed);
+        padding: 24px 8px;
+    }
+}
+
+/* Mobile: hide right sidebar */
+@media (max-width: 767px) {
+    .rightSidebar {
+        display: none;
+    }
+}
+
+.rightSidebarItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: #6B6B6B;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.15s ease;
+    font-family: inherit;
+    text-align: left;
+    width: 100%;
+}
+
+.rightSidebarItem:hover {
+    color: #3A3A3A;
+}
+
+.rightSidebarItemActive {
+    color: #3A3A3A;
+}
+
+.rightSidebarIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.rightSidebarItemActive .rightSidebarIcon {
+    color: #7A6052;
+}
+
+.rightSidebarLabel {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Hide labels on tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .rightSidebarItem {
+        padding: 12px;
+        justify-content: center;
+    }
+
+    .rightSidebarLabel {
+        display: none;
+    }
+}
+
+/* Tooltip for right sidebar collapsed mode */
+.rightTooltip {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #3A3A3A;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.rightTooltip::before {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: #3A3A3A;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .rightSidebarItem:hover .rightTooltip {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+/* ==================== Bottom Navigation (Mobile) ==================== */
+.bottomNav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(197, 201, 164, 0.3);
+    padding: 8px 16px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 100;
+}
+
+/* Show bottom nav only on mobile */
+@media (max-width: 767px) {
+    .bottomNav {
+        display: flex;
+    }
+}
+
+.bottomNavItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    color: #6B6B6B;
+    text-decoration: none;
+    min-width: 64px;
+    position: relative;
+}
+
+.bottomNavItemActive {
+    color: #3A3A3A;
+}
+
+.bottomNavItemActive .bottomNavIcon {
+    color: #7A6052;
+}
+
+.bottomNavIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bottomNavLabel {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* ==================== Mobile Horizontal Tabs ==================== */
+.mobileTabs {
+    display: none;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 16px 16px;
+    margin: 0 -16px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.mobileTabs::-webkit-scrollbar {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobileTabs {
+        display: flex;
+    }
+}
+
+.mobileTabItem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: rgba(197, 201, 164, 0.15);
+    color: #6B6B6B;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.mobileTabItem:hover {
+    background: rgba(197, 201, 164, 0.25);
+}
+
+.mobileTabItemActive {
+    background: rgba(197, 201, 164, 0.4);
+    color: #3A3A3A;
+}
+
+.mobileTabIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

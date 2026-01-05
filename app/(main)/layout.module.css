@@ -1,0 +1,31 @@
+.layoutContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.mainContent {
+    flex: 1;
+    overflow-y: auto;
+
+    /* Desktop: account for left sidebar */
+    margin-left: 200px;
+    padding: 24px;
+}
+
+/* Tablet: narrower sidebar */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .mainContent {
+        margin-left: 64px;
+        padding: 20px;
+    }
+}
+
+/* Mobile: no sidebar, account for bottom nav */
+@media (max-width: 767px) {
+    .mainContent {
+        margin-left: 0;
+        padding: 16px;
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 16px);
+    }
+}

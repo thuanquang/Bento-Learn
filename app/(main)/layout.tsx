@@ -1,8 +1,9 @@
 "use client";
 
-import { BottomNav } from "@/components/navigation/bottom-nav";
+import { SideNav, BottomNav } from "@/components/navigation/side-nav";
 import { AuthProvider } from "@/lib/auth-context";
 import { TimerProvider } from "@/lib/timer-context";
+import styles from "./layout.module.css";
 
 export default function MainLayout({
   children,
@@ -12,19 +13,17 @@ export default function MainLayout({
   return (
     <TimerProvider>
       <AuthProvider>
-        <div style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}>
-          <main style={{
-            flex: 1,
-            paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-            overflowY: "auto",
-          }}>
+        <div className={styles.layoutContainer}>
+          {/* Desktop/Tablet: Side Navigation */}
+          <SideNav />
+
+          {/* Mobile: Bottom Navigation */}
+          <BottomNav />
+
+          {/* Main Content Area */}
+          <main className={styles.mainContent}>
             {children}
           </main>
-          <BottomNav />
         </div>
       </AuthProvider>
     </TimerProvider>

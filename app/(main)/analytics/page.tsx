@@ -20,6 +20,7 @@ import {
   usePrefersReducedMotion
 } from "@/lib/motion";
 import { useAuth } from "@/lib/auth-context";
+import { RightSidebar, MobileTabs, type RightSidebarItem } from "@/components/navigation/right-sidebar";
 import styles from "./analytics.module.css";
 
 type AnalyticsTab = "overview" | "insights" | "awards" | "history";
@@ -605,12 +606,17 @@ export default function AnalyticsPage() {
     fetchData();
   }, [user]);
 
-  const tabs: { id: AnalyticsTab; label: string; icon: React.ReactNode }[] = [
+  // Tab items for RightSidebar and MobileTabs
+  const tabItems: RightSidebarItem[] = [
     { id: "overview", label: "Overview", icon: <BarChart3 size={18} /> },
     { id: "insights", label: "Insights", icon: <Lightbulb size={18} /> },
     { id: "awards", label: "Awards", icon: <Trophy size={18} /> },
     { id: "history", label: "History", icon: <History size={18} /> },
   ];
+
+  const handleTabChange = (id: string) => {
+    setActiveTab(id as AnalyticsTab);
+  };
 
   const renderTabContent = () => {
     if (loading) return <LoadingState />;
@@ -632,26 +638,20 @@ export default function AnalyticsPage() {
       animate={prefersReducedMotion ? {} : { opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      <nav className={styles.tabNav}>
-        {tabs.map((tab) => (
-          <motion.button
-            key={tab.id}
-            className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabBtnActive : ""}`}
-            onClick={() => setActiveTab(tab.id)}
-            whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-            {activeTab === tab.id && !prefersReducedMotion && (
-              <motion.div
-                className={styles.activeIndicator}
-                layoutId="activeTab"
-                transition={springTransition}
-              />
-            )}
-          </motion.button>
-        ))}
-      </nav>
+      {/* Right Sidebar - Desktop/Tablet only */}
+      <RightSidebar
+        items={tabItems}
+        activeId={activeTab}
+        onItemClick={handleTabChange}
+        ariaLabel="Analytics navigation"
+      />
+
+      {/* Mobile Tabs - Mobile only */}
+      <MobileTabs
+        items={tabItems}
+        activeId={activeTab}
+        onItemClick={handleTabChange}
+      />
 
       <div className={styles.contentArea}>
         <AnimatePresence mode="wait">
@@ -669,3 +669,4 @@ export default function AnalyticsPage() {
     </motion.div>
   );
 }
+

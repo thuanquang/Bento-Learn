@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
   Lightbulb,
@@ -8,41 +9,52 @@ import {
   History,
   Flame,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Loader2
 } from "lucide-react";
+import {
+  staggerContainer,
+  staggerItem,
+  tabContentVariants,
+  springTransition,
+  usePrefersReducedMotion
+} from "@/lib/motion";
+import { useAuth } from "@/lib/auth-context";
 import styles from "./analytics.module.css";
 
 type AnalyticsTab = "overview" | "insights" | "awards" | "history";
 
-// Mock data - in production this would come from the database
-const mockData = {
-  userName: "Alex",
-  focusScore: 87,
-  focusScoreTrend: 5,
-  currentStreak: 5,
-  totalSessions: 42,
-  totalFocusMinutes: 1260,
+interface AnalyticsData {
+  userName: string;
+  focusScore: number;
+  focusScoreTrend: number;
+  currentStreak: number;
+  totalSessions: number;
+  totalFocusMinutes: number;
   sessionDistribution: {
-    timer: 20,
-    bento: 15,
-    routine: 7,
-  },
-  recentSessions: [
-    { id: "1", type: "TIMER", taskName: "Deep Work", duration: 25, focusScore: 100, completedAt: new Date() },
-    { id: "2", type: "BENTO", taskName: "Email Batch", duration: 15, focusScore: 85, completedAt: new Date(Date.now() - 3600000) },
-    { id: "3", type: "TIMER", taskName: "Code Review", duration: 45, focusScore: 72, completedAt: new Date(Date.now() - 7200000) },
-  ],
+    timer: number;
+    bento: number;
+    routine: number;
+  };
+  recentSessions: Array<{
+    id: string;
+    type: string;
+    taskName: string;
+    duration: number;
+    focusScore: number;
+    completedAt: string;
+  }>;
   insights: {
-    peakPerformance: { window: "Morning (9-12am)", score: 92 },
-    focusSweetSpot: { duration: "25-30 min", score: 94 },
-    averageSession: 27,
-    monthlyTotal: { hours: 21, minutes: 0 },
-  },
+    peakPerformance: { window: string; score: number } | null;
+    focusSweetSpot: { duration: string; score: number } | null;
+    averageSession: number;
+    monthlyTotal: { hours: number; minutes: number };
+  };
   awards: {
-    unlocked: ["TASK_STARTER", "TIMER_SPECIALIST"],
-    nextAward: { type: "PERFECT_FOCUS", progress: 8, total: 25 },
-  },
-};
+    unlocked: string[];
+    nextAward: { type: string; progress: number; total: number } | null;
+  };
+}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -65,43 +77,103 @@ function getScoreColor(score: number): string {
   return "#7A6052";
 }
 
-// Tab components
-function OverviewTab() {
-  const [sessionCount, setSessionCount] = useState<25 | 50 | 100>(25);
+// Animated Counter Hook
+function useAnimatedCounter(target: number, duration: number = 1000) {
+  const [count, setCount] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  const total = mockData.sessionDistribution.timer +
-    mockData.sessionDistribution.bento +
-    mockData.sessionDistribution.routine;
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setCount(target);
+      return;
+    }
+
+    let startTime: number | null = null;
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setCount(Math.floor(progress * target));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [target, duration, prefersReducedMotion]);
+
+  return count;
+}
+
+// Tab components with data props
+function OverviewTab({ data }: { data: AnalyticsData }) {
+  const [sessionCount, setSessionCount] = useState<25 | 50 | 100>(25);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  const total = data.sessionDistribution.timer +
+    data.sessionDistribution.bento +
+    data.sessionDistribution.routine;
+
+  const containerProps = prefersReducedMotion ? {} : {
+    variants: staggerContainer,
+    initial: "hidden",
+    animate: "visible"
+  };
+
+  const itemProps = prefersReducedMotion ? {} : { variants: staggerItem };
+
+  if (total === 0) {
+    return (
+      <motion.div className={styles.tabContent} {...containerProps}>
+        <motion.div className={styles.greetingCard} {...itemProps}>
+          <h2>{getGreeting()}, {data.userName}!</h2>
+          <p className={styles.date}>{formatDate()}</p>
+        </motion.div>
+        <motion.div className={styles.emptyState} {...itemProps}>
+          <p>Complete your first focus session to see your stats!</p>
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
-    <div className={styles.tabContent}>
-      <div className={styles.greetingCard}>
-        <h2>{getGreeting()}, {mockData.userName}!</h2>
+    <motion.div
+      className={styles.tabContent}
+      {...containerProps}
+    >
+      <motion.div className={styles.greetingCard} {...itemProps}>
+        <h2>{getGreeting()}, {data.userName}!</h2>
         <p className={styles.date}>{formatDate()}</p>
-      </div>
+      </motion.div>
 
-      <div className={styles.statsRow}>
-        <div className={styles.focusScoreCard}>
+      <motion.div className={styles.statsRow} {...itemProps}>
+        <motion.div
+          className={styles.focusScoreCard}
+          whileHover={prefersReducedMotion ? {} : { y: -2 }}
+          transition={springTransition}
+        >
           <span className={styles.label}>Focus Score</span>
           <div
             className={styles.scoreBadge}
-            style={{ backgroundColor: getScoreColor(mockData.focusScore) }}
+            style={{ backgroundColor: getScoreColor(data.focusScore) }}
           >
-            <span className={styles.score}>{mockData.focusScore}%</span>
+            <span className={styles.score}>{data.focusScore}%</span>
           </div>
-        </div>
+        </motion.div>
 
-        <div className={styles.streakCard}>
+        <motion.div
+          className={styles.streakCard}
+          whileHover={prefersReducedMotion ? {} : { y: -2 }}
+          transition={springTransition}
+        >
           <span className={styles.label}>Current Streak</span>
           <div className={styles.streakValue}>
             <Flame size={24} className={styles.flameIcon} />
-            <span className={styles.days}>{mockData.currentStreak}</span>
+            <span className={styles.days}>{data.currentStreak}</span>
             <span className={styles.suffix}>days</span>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className={styles.chartCard}>
+      <motion.div className={styles.chartCard} {...itemProps}>
         <div className={styles.chartHeader}>
           <h3>Session Types</h3>
           <select
@@ -116,103 +188,149 @@ function OverviewTab() {
         </div>
 
         <div className={styles.pieChart}>
-          <div className={styles.pieVisual}>
+          <motion.div
+            className={styles.pieVisual}
+            initial={prefersReducedMotion ? {} : { rotate: -90, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { rotate: 0, opacity: 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
             <div
               className={styles.pie}
               style={{
                 background: `conic-gradient(
-                  #C5C9A4 0deg ${(mockData.sessionDistribution.timer / total) * 360}deg,
-                  #7A6052 ${(mockData.sessionDistribution.timer / total) * 360}deg ${((mockData.sessionDistribution.timer + mockData.sessionDistribution.bento) / total) * 360}deg,
-                  #D4A27C ${((mockData.sessionDistribution.timer + mockData.sessionDistribution.bento) / total) * 360}deg 360deg
+                  #C5C9A4 0deg ${(data.sessionDistribution.timer / total) * 360}deg,
+                  #7A6052 ${(data.sessionDistribution.timer / total) * 360}deg ${((data.sessionDistribution.timer + data.sessionDistribution.bento) / total) * 360}deg,
+                  #D4A27C ${((data.sessionDistribution.timer + data.sessionDistribution.bento) / total) * 360}deg 360deg
                 )`
               }}
             />
-          </div>
+          </motion.div>
           <div className={styles.pieLegend}>
             <div className={styles.legendItem}>
               <span className={styles.legendDot} style={{ backgroundColor: "#C5C9A4" }} />
-              <span>Timer ({mockData.sessionDistribution.timer})</span>
+              <span>Timer ({data.sessionDistribution.timer})</span>
             </div>
             <div className={styles.legendItem}>
               <span className={styles.legendDot} style={{ backgroundColor: "#7A6052" }} />
-              <span>Bento ({mockData.sessionDistribution.bento})</span>
+              <span>Bento ({data.sessionDistribution.bento})</span>
             </div>
             <div className={styles.legendItem}>
               <span className={styles.legendDot} style={{ backgroundColor: "#D4A27C" }} />
-              <span>Routine ({mockData.sessionDistribution.routine})</span>
+              <span>Routine ({data.sessionDistribution.routine})</span>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
-function InsightsTab() {
-  const isImproving = mockData.focusScoreTrend > 0;
+function InsightsTab({ data }: { data: AnalyticsData }) {
+  const isImproving = data.focusScoreTrend > 0;
+  const animatedScore = useAnimatedCounter(data.focusScore);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  const containerProps = prefersReducedMotion ? {} : {
+    variants: staggerContainer,
+    initial: "hidden",
+    animate: "visible"
+  };
+
+  const itemProps = prefersReducedMotion ? {} : { variants: staggerItem };
+
+  if (data.totalSessions < 5) {
+    return (
+      <motion.div className={styles.tabContent} {...containerProps}>
+        <motion.div className={styles.emptyState} {...itemProps}>
+          <p>Complete at least 5 sessions to unlock insights!</p>
+          <p className={styles.progressNote}>You&apos;ve completed {data.totalSessions} so far.</p>
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
-    <div className={styles.tabContent} style={{ gap: "24px" }}>
-      <div className={styles.scoreHero}>
+    <motion.div
+      className={styles.tabContent}
+      style={{ gap: "24px" }}
+      {...containerProps}
+    >
+      <motion.div className={styles.scoreHero} {...itemProps}>
         <span className={styles.label}>Your Focus Score</span>
         <div className={styles.heroRow}>
-          <span
+          <motion.span
             className={styles.heroScore}
-            style={{ color: getScoreColor(mockData.focusScore) }}
+            style={{ color: getScoreColor(data.focusScore) }}
+            initial={prefersReducedMotion ? {} : { scale: 0.8, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            {mockData.focusScore}%
-          </span>
+            {prefersReducedMotion ? data.focusScore : animatedScore}%
+          </motion.span>
           <div className={`${styles.trend} ${isImproving ? styles.trendUp : styles.trendDown}`}>
             {isImproving ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-            <span>{Math.abs(mockData.focusScoreTrend)}% from last week</span>
+            <span>{Math.abs(data.focusScoreTrend)}% from last week</span>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className={styles.smartInsights}>
+      <motion.div className={styles.smartInsights} {...itemProps}>
         <h3>Smart Insights</h3>
-        <div className={styles.insightCards}>
-          <div className={styles.insightCard}>
-            <span className={styles.insightIcon}>🔥</span>
-            <p>You&apos;re on fire! {mockData.currentStreak}-day streak and counting.</p>
-          </div>
-          <div className={styles.insightCard}>
-            <span className={styles.insightIcon}>📈</span>
-            <p>Your focus score improved {mockData.focusScoreTrend}% this week.</p>
-          </div>
-          <div className={styles.insightCard}>
-            <span className={styles.insightIcon}>⏰</span>
-            <p>You focus best in {mockData.insights.focusSweetSpot.duration} sessions.</p>
-          </div>
-        </div>
-      </div>
+        <motion.div
+          className={styles.insightCards}
+          variants={prefersReducedMotion ? {} : staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          {[
+            { icon: "🔥", text: `You're on fire! ${data.currentStreak}-day streak and counting.` },
+            { icon: "📈", text: data.focusScoreTrend >= 0 ? `Your focus score improved ${data.focusScoreTrend}% this week.` : `Focus score down ${Math.abs(data.focusScoreTrend)}% - you got this!` },
+            { icon: "⏰", text: data.insights.focusSweetSpot ? `You focus best in ${data.insights.focusSweetSpot.duration} sessions.` : "Complete more sessions to find your sweet spot!" },
+          ].map((insight, i) => (
+            <motion.div
+              key={i}
+              className={styles.insightCard}
+              variants={prefersReducedMotion ? {} : staggerItem}
+              whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
+            >
+              <span className={styles.insightIcon}>{insight.icon}</span>
+              <p>{insight.text}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.div>
 
-      <div className={styles.personalInsights}>
+      <motion.div className={styles.personalInsights} {...itemProps}>
         <h3>Personal Insights</h3>
-        <div className={styles.insightsGrid}>
-          <div className={styles.insightItem}>
+        <motion.div
+          className={styles.insightsGrid}
+          variants={prefersReducedMotion ? {} : staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div className={styles.insightItem} variants={prefersReducedMotion ? {} : staggerItem}>
             <span className={styles.insightLabel}>🌅 Peak Performance</span>
-            <span className={styles.insightValue}>{mockData.insights.peakPerformance.window}</span>
-            <span className={styles.insightScore}>{mockData.insights.peakPerformance.score}% avg</span>
-          </div>
-          <div className={styles.insightItem}>
+            <span className={styles.insightValue}>{data.insights.peakPerformance?.window || "Not enough data"}</span>
+            {data.insights.peakPerformance && <span className={styles.insightScore}>{data.insights.peakPerformance.score}% avg</span>}
+          </motion.div>
+          <motion.div className={styles.insightItem} variants={prefersReducedMotion ? {} : staggerItem}>
             <span className={styles.insightLabel}>🎯 Focus Sweet Spot</span>
-            <span className={styles.insightValue}>{mockData.insights.focusSweetSpot.duration}</span>
-            <span className={styles.insightScore}>{mockData.insights.focusSweetSpot.score}% avg</span>
-          </div>
-          <div className={styles.insightItem}>
+            <span className={styles.insightValue}>{data.insights.focusSweetSpot?.duration || "Not enough data"}</span>
+            {data.insights.focusSweetSpot && <span className={styles.insightScore}>{data.insights.focusSweetSpot.score}% avg</span>}
+          </motion.div>
+          <motion.div className={styles.insightItem} variants={prefersReducedMotion ? {} : staggerItem}>
             <span className={styles.insightLabel}>⏱️ Average Session</span>
-            <span className={styles.insightValue}>{mockData.insights.averageSession} minutes</span>
-          </div>
-          <div className={styles.insightItem}>
+            <span className={styles.insightValue}>{data.insights.averageSession} minutes</span>
+          </motion.div>
+          <motion.div className={styles.insightItem} variants={prefersReducedMotion ? {} : staggerItem}>
             <span className={styles.insightLabel}>📊 Monthly Total</span>
             <span className={styles.insightValue}>
-              {mockData.insights.monthlyTotal.hours}h {mockData.insights.monthlyTotal.minutes}m
+              {data.insights.monthlyTotal.hours}h {data.insights.monthlyTotal.minutes}m
             </span>
-          </div>
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -233,78 +351,129 @@ const AWARDS = {
 
 type AwardKey = keyof typeof AWARDS;
 
-function AwardsTab() {
+function AwardsTab({ data }: { data: AnalyticsData }) {
   const [expandedCategory, setExpandedCategory] = useState<string | null>("Focus Mastery");
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const categories = ["Focus Mastery", "ADHD Superpowers", "Consistency Builder"];
   const getAwardsByCategory = (category: string): AwardKey[] => {
     return (Object.keys(AWARDS) as AwardKey[]).filter((key) => AWARDS[key].category === category);
   };
 
-  const nextAward = AWARDS[mockData.awards.nextAward.type as AwardKey];
-  const progress = (mockData.awards.nextAward.progress / mockData.awards.nextAward.total) * 100;
+  const nextAward = data.awards.nextAward ? AWARDS[data.awards.nextAward.type as AwardKey] : null;
+  const progress = data.awards.nextAward ? (data.awards.nextAward.progress / data.awards.nextAward.total) * 100 : 0;
 
   return (
-    <div className={styles.tabContent}>
-      <div className={styles.nextAward}>
-        <span className={styles.label}>Your Next Award</span>
-        <div className={styles.awardPreview}>
-          <span className={styles.awardIcon}>{nextAward.icon}</span>
-          <div className={styles.awardInfo}>
-            <span className={styles.awardName}>{nextAward.name}</span>
-            <span className={styles.awardDesc}>{nextAward.description}</span>
+    <motion.div
+      className={styles.tabContent}
+      initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+      animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      {nextAward && data.awards.nextAward && (
+        <motion.div
+          className={styles.nextAward}
+          initial={prefersReducedMotion ? {} : { scale: 0.95, opacity: 0 }}
+          animate={prefersReducedMotion ? {} : { scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, ...springTransition }}
+        >
+          <span className={styles.label}>Your Next Award</span>
+          <div className={styles.awardPreview}>
+            <motion.span
+              className={styles.awardIcon}
+              animate={prefersReducedMotion ? {} : { rotate: [0, -10, 10, 0] }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {nextAward.icon}
+            </motion.span>
+            <div className={styles.awardInfo}>
+              <span className={styles.awardName}>{nextAward.name}</span>
+              <span className={styles.awardDesc}>{nextAward.description}</span>
+            </div>
           </div>
-        </div>
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-        </div>
-        <span className={styles.progressText}>
-          {mockData.awards.nextAward.progress} / {mockData.awards.nextAward.total}
-        </span>
-      </div>
+          <div className={styles.progressBar}>
+            <motion.div
+              className={styles.progressFill}
+              initial={prefersReducedMotion ? { width: `${progress}%` } : { width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            />
+          </div>
+          <span className={styles.progressText}>
+            {data.awards.nextAward.progress} / {data.awards.nextAward.total}
+          </span>
+        </motion.div>
+      )}
 
-      {categories.map((category) => (
-        <div key={category} className={styles.category}>
-          <button
+      {categories.map((category, categoryIndex) => (
+        <motion.div
+          key={category}
+          className={styles.category}
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 * (categoryIndex + 1) }}
+        >
+          <motion.button
             className={styles.categoryHeader}
             onClick={() => setExpandedCategory(expandedCategory === category ? null : category)}
+            whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
           >
             <span>{category}</span>
-            <span className={styles.expandIcon}>{expandedCategory === category ? "−" : "+"}</span>
-          </button>
+            <motion.span
+              className={styles.expandIcon}
+              animate={{ rotate: expandedCategory === category ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {expandedCategory === category ? "−" : "+"}
+            </motion.span>
+          </motion.button>
 
-          {expandedCategory === category && (
-            <div className={styles.awardsList}>
-              {getAwardsByCategory(category).map((key) => {
-                const award = AWARDS[key];
-                const isUnlocked = mockData.awards.unlocked.includes(key);
+          <AnimatePresence>
+            {expandedCategory === category && (
+              <motion.div
+                className={styles.awardsList}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {getAwardsByCategory(category).map((key, i) => {
+                  const award = AWARDS[key];
+                  const isUnlocked = data.awards.unlocked.includes(key);
 
-                return (
-                  <div
-                    key={key}
-                    className={`${styles.awardCard} ${isUnlocked ? styles.awardCardUnlocked : styles.awardCardLocked}`}
-                  >
-                    <span className={styles.awardCardIcon}>{award.icon}</span>
-                    <div className={styles.awardDetails}>
-                      <span className={styles.awardDetailsName}>{award.name}</span>
-                      <span className={styles.awardDetailsDesc}>{award.description}</span>
-                      {isUnlocked && <span className={styles.unlockedBadge}>Unlocked ✓</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  return (
+                    <motion.div
+                      key={key}
+                      className={`${styles.awardCard} ${isUnlocked ? styles.awardCardUnlocked : styles.awardCardLocked}`}
+                      initial={prefersReducedMotion ? {} : { opacity: 0, x: -20 }}
+                      animate={prefersReducedMotion ? {} : { opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
+                    >
+                      <span className={styles.awardCardIcon}>{award.icon}</span>
+                      <div className={styles.awardDetails}>
+                        <span className={styles.awardDetailsName}>{award.name}</span>
+                        <span className={styles.awardDetailsDesc}>{award.description}</span>
+                        {isUnlocked && <span className={styles.unlockedBadge}>Unlocked ✓</span>}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
-function HistoryTab() {
+function HistoryTab({ data }: { data: AnalyticsData }) {
   const [sessionCount, setSessionCount] = useState<25 | 50 | 100>(25);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  const formatTime = (date: Date): string => {
+  const formatTime = (dateStr: string): string => {
+    const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -324,9 +493,28 @@ function HistoryTab() {
     }
   };
 
+  if (data.recentSessions.length === 0) {
+    return (
+      <motion.div className={styles.tabContent}>
+        <div className={styles.emptyState}>
+          <p>No sessions yet. Complete your first focus session!</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
-    <div className={styles.tabContent}>
-      <div className={styles.historyHeader}>
+    <motion.div
+      className={styles.tabContent}
+      initial={prefersReducedMotion ? {} : { opacity: 0 }}
+      animate={prefersReducedMotion ? {} : { opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.div
+        className={styles.historyHeader}
+        initial={prefersReducedMotion ? {} : { y: -10, opacity: 0 }}
+        animate={prefersReducedMotion ? {} : { y: 0, opacity: 1 }}
+      >
         <select
           value={sessionCount}
           onChange={(e) => setSessionCount(Number(e.target.value) as 25 | 50 | 100)}
@@ -336,11 +524,21 @@ function HistoryTab() {
           <option value={50}>Last 50 sessions</option>
           <option value={100}>Last 100 sessions</option>
         </select>
-      </div>
+      </motion.div>
 
-      <div className={styles.sessionsList}>
-        {mockData.recentSessions.map((session) => (
-          <div key={session.id} className={styles.sessionCard}>
+      <motion.div
+        className={styles.sessionsList}
+        variants={prefersReducedMotion ? {} : staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        {data.recentSessions.map((session) => (
+          <motion.div
+            key={session.id}
+            className={styles.sessionCard}
+            variants={prefersReducedMotion ? {} : staggerItem}
+            whileHover={prefersReducedMotion ? {} : { x: 4 }}
+          >
             <div className={styles.sessionRow}>
               <span
                 className={styles.typeBadge}
@@ -364,15 +562,48 @@ function HistoryTab() {
                 {session.focusScore}%
               </span>
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className={styles.loadingState}>
+      <Loader2 className={styles.spinner} size={32} />
+      <p>Loading your analytics...</p>
     </div>
   );
 }
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!user) return;
+
+      try {
+        const response = await fetch("/api/analytics");
+        if (response.ok) {
+          const analyticsData = await response.json();
+          setData(analyticsData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch analytics:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [user]);
 
   const tabs: { id: AnalyticsTab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Overview", icon: <BarChart3 size={18} /> },
@@ -382,33 +613,59 @@ export default function AnalyticsPage() {
   ];
 
   const renderTabContent = () => {
+    if (loading) return <LoadingState />;
+    if (!data) return <div className={styles.emptyState}><p>Unable to load analytics data.</p></div>;
+
     switch (activeTab) {
-      case "overview": return <OverviewTab />;
-      case "insights": return <InsightsTab />;
-      case "awards": return <AwardsTab />;
-      case "history": return <HistoryTab />;
-      default: return <OverviewTab />;
+      case "overview": return <OverviewTab key="overview" data={data} />;
+      case "insights": return <InsightsTab key="insights" data={data} />;
+      case "awards": return <AwardsTab key="awards" data={data} />;
+      case "history": return <HistoryTab key="history" data={data} />;
+      default: return <OverviewTab key="overview" data={data} />;
     }
   };
 
   return (
-    <div className={styles.analyticsPage}>
+    <motion.div
+      className={styles.analyticsPage}
+      initial={prefersReducedMotion ? {} : { opacity: 0 }}
+      animate={prefersReducedMotion ? {} : { opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <nav className={styles.tabNav}>
         {tabs.map((tab) => (
-          <button
+          <motion.button
             key={tab.id}
             className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabBtnActive : ""}`}
             onClick={() => setActiveTab(tab.id)}
+            whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
           >
             {tab.icon}
             <span>{tab.label}</span>
-          </button>
+            {activeTab === tab.id && !prefersReducedMotion && (
+              <motion.div
+                className={styles.activeIndicator}
+                layoutId="activeTab"
+                transition={springTransition}
+              />
+            )}
+          </motion.button>
         ))}
       </nav>
 
       <div className={styles.contentArea}>
-        {renderTabContent()}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            variants={prefersReducedMotion ? {} : tabContentVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            {renderTabContent()}
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useTimer, TimerResult } from "@/lib/use-timer";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useTimerContext, TimerResult } from "@/lib/timer-context";
 import { AMBIENT_SOUNDS } from "@/lib/sounds";
 import { getScoreColor } from "@/lib/focus-score";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  staggerContainer,
+  staggerItem,
+  springTransition,
+  celebrationBounce,
+  modalOverlayVariants,
+  modalContentVariants,
+  usePrefersReducedMotion
+} from "@/lib/motion";
 import {
   GripVertical,
   Play,
@@ -13,6 +23,11 @@ import {
   Volume2,
   Check
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { createBentoSession } from "@/app/actions/session-actions";
+import { saveLocalSession } from "@/lib/local-sessions";
+import { SessionType } from "@prisma/client";
+import Link from "next/link";
 import styles from "./focus-box.module.css";
 
 interface BentoTask {
@@ -33,31 +48,136 @@ interface TaskResult extends TimerResult {
   taskName: string;
 }
 
+// Animated Counter Hook
+function useAnimatedCounter(target: number, duration: number = 800) {
+  const [count, setCount] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setCount(target);
+      return;
+    }
+
+    let startTime: number | null = null;
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setCount(Math.floor(progress * target));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [target, duration, prefersReducedMotion]);
+
+  return count;
+}
+
 export default function FocusBoxPage() {
   const [tasks, setTasks] = useState<BentoTask[]>(DEFAULT_TASKS);
-  const [state, setState] = useState<FocusBoxState>("config");
+  const [focusBoxState, setFocusBoxState] = useState<FocusBoxState>("config");
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [soundId, setSoundId] = useState("off");
   const [results, setResults] = useState<TaskResult[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const { user } = useAuth();
+
+  // Use ref to track current task index in callbacks
+  const currentTaskIndexRef = useRef(currentTaskIndex);
+  currentTaskIndexRef.current = currentTaskIndex;
+
+  // Use ref to track tasks in callbacks
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
 
   const currentTask = tasks[currentTaskIndex];
 
-  const timer = useTimer({
-    onComplete: (result) => {
-      const taskResult: TaskResult = {
-        ...result,
-        taskName: currentTask?.name || `Task ${currentTaskIndex + 1}`,
-      };
-      setResults((prev) => [...prev, taskResult]);
+  // Use shared timer context
+  const timer = useTimerContext();
 
-      if (currentTaskIndex < 2) {
-        setState("intermission");
-      } else {
-        setState("completed");
+  // Handle timer completion for Focus Box
+  const handleTimerComplete = useCallback((result: TimerResult) => {
+    const taskIndex = currentTaskIndexRef.current;
+    const currentTasks = tasksRef.current;
+    const taskResult: TaskResult = {
+      ...result,
+      taskName: currentTasks[taskIndex]?.name || `Task ${taskIndex + 1}`,
+    };
+    setResults((prev) => [...prev, taskResult]);
+
+    if (taskIndex < 2) {
+      setFocusBoxState("intermission");
+    } else {
+      setFocusBoxState("completed");
+    }
+  }, []);
+
+  // Register onComplete callback when Focus Box session is active
+  useEffect(() => {
+    if (timer.sessionType === "focusbox" && focusBoxState === "running") {
+      timer.setOnComplete(handleTimerComplete);
+    }
+    return () => {
+      if (timer.sessionType === "focusbox") {
+        timer.setOnComplete(null);
       }
-    },
-  });
+    };
+  }, [handleTimerComplete, timer.sessionType, timer.setOnComplete, focusBoxState]);
+
+  // Update document title when timer is running in Focus Box
+  useEffect(() => {
+    if (focusBoxState === "running" && (timer.state === "running" || timer.state === "paused")) {
+      document.title = `${timer.formattedTime} - ${currentTask?.name || "Focus Box"}`;
+    } else if (focusBoxState === "config" || focusBoxState === "completed") {
+      document.title = "Bento Focus";
+    }
+
+    return () => {
+      document.title = "Bento Focus";
+    };
+  }, [focusBoxState, timer.state, timer.formattedTime, currentTask?.name]);
+
+  // Save bento session when state becomes completed
+  useEffect(() => {
+    if (focusBoxState === "completed" && results.length === 3) {
+      const saveSession = async () => {
+        if (user) {
+          // Authenticated: save to database
+          await createBentoSession({
+            userId: user.id,
+            tasks: results.map((r) => ({
+              taskName: r.taskName,
+              durationPlanned: r.durationPlanned,
+              durationActual: r.durationActual,
+              pauseCount: r.pauseCount,
+              focusScore: r.focusScore,
+            })),
+          });
+        } else {
+          // Guest: save each task to localStorage
+          const bentoSessionId = `bento-${Date.now()}`;
+          results.forEach((r, index) => {
+            saveLocalSession({
+              type: SessionType.BENTO,
+              taskName: r.taskName,
+              durationPlanned: r.durationPlanned,
+              durationActual: r.durationActual,
+              pauseCount: r.pauseCount,
+              focusScore: r.focusScore,
+              completedAt: new Date().toISOString(),
+              bentoSessionId,
+              bentoTaskIndex: index,
+            });
+          });
+          setShowGuestPrompt(true);
+        }
+      };
+      saveSession();
+    }
+  }, [focusBoxState, results, user]);
 
   const updateTask = useCallback((index: number, updates: Partial<BentoTask>) => {
     setTasks((prev) => prev.map((task, i) =>
@@ -94,12 +214,14 @@ export default function FocusBoxPage() {
 
     setCurrentTaskIndex(0);
     setResults([]);
+    timer.reset();
     timer.updateConfig({
       durationMinutes: tasks[0].durationMinutes,
       taskName: tasks[0].name,
       soundId,
     });
-    setState("running");
+    timer.setSessionType("focusbox");
+    setFocusBoxState("running");
 
     setTimeout(() => {
       timer.start();
@@ -115,7 +237,7 @@ export default function FocusBoxPage() {
       taskName: tasks[nextIndex].name,
       soundId,
     });
-    setState("running");
+    setFocusBoxState("running");
 
     setTimeout(() => {
       timer.start();
@@ -124,14 +246,14 @@ export default function FocusBoxPage() {
 
   const endSessionEarly = () => {
     timer.stopEarly();
-    setState("completed");
+    setFocusBoxState("completed");
   };
 
   const resetSession = () => {
     timer.reset();
     setResults([]);
     setCurrentTaskIndex(0);
-    setState("config");
+    setFocusBoxState("config");
   };
 
   const totalDuration = results.reduce((sum, r) => sum + r.durationActual, 0);
@@ -139,23 +261,56 @@ export default function FocusBoxPage() {
     ? Math.round(results.reduce((sum, r) => sum + r.focusScore, 0) / results.length)
     : 0;
 
-  // Configuration View
-  if (state === "config") {
-    return (
-      <div className={styles.page}>
-        <div className={styles.container}>
-          <h1 className={styles.title}>Focus Box</h1>
-          <p className={styles.subtitle}>Set up your 3-task bento session</p>
+  const animatedAvgScore = useAnimatedCounter(avgFocusScore);
+  const animatedDuration = useAnimatedCounter(Math.round(totalDuration / 60));
 
-          <div className={styles.bentoGrid}>
+  // Configuration View
+  if (focusBoxState === "config") {
+    return (
+      <motion.div
+        className={styles.page}
+        initial={prefersReducedMotion ? {} : { opacity: 0 }}
+        animate={prefersReducedMotion ? {} : { opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className={styles.container}>
+          <motion.h1
+            className={styles.title}
+            initial={prefersReducedMotion ? {} : { y: -20, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { y: 0, opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
+            Focus Box
+          </motion.h1>
+          <motion.p
+            className={styles.subtitle}
+            initial={prefersReducedMotion ? {} : { y: -10, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { y: 0, opacity: 1 }}
+            transition={{ delay: 0.15 }}
+          >
+            Set up your 3-task bento session
+          </motion.p>
+
+          <motion.div
+            className={styles.bentoGrid}
+            variants={prefersReducedMotion ? {} : staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
             {tasks.map((task, index) => (
-              <div
+              <motion.div
                 key={task.id}
-                className={`${styles.taskSlot} ${index === 2 ? styles.fullWidth : ""}`}
+                className={`${styles.taskSlot} ${index === 2 ? styles.fullWidth : ""} ${draggedIndex === index ? styles.dragging : ""}`}
                 draggable
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
+                variants={prefersReducedMotion ? {} : staggerItem}
+                whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
+                whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
+                animate={draggedIndex === index ? { scale: 1.05, boxShadow: "0 8px 32px rgba(0,0,0,0.3)" } : {}}
+                layout
+                transition={springTransition}
               >
                 <div className={styles.dragHandle}>
                   <GripVertical size={18} />
@@ -183,11 +338,16 @@ export default function FocusBoxPage() {
                     ))}
                   </select>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          <div className={styles.soundSection}>
+          <motion.div
+            className={styles.soundSection}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 10 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <Volume2 size={18} />
             <select
               value={soundId}
@@ -200,45 +360,96 @@ export default function FocusBoxPage() {
                 </option>
               ))}
             </select>
-          </div>
+          </motion.div>
 
-          <button
+          <motion.button
             className={styles.startBtn}
             onClick={startSession}
             disabled={!canStartSession}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+            animate={prefersReducedMotion ? {} : {
+              opacity: 1,
+              y: 0,
+              scale: canStartSession ? [1, 1.02, 1] : 1
+            }}
+            transition={{
+              delay: 0.5,
+              scale: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+            }}
+            whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
           >
             <Play size={20} />
             Start Focus
-          </button>
+          </motion.button>
 
-          {!canStartSession && (
-            <p className={styles.errorText}>Please name all 3 tasks to begin</p>
-          )}
+          <AnimatePresence>
+            {!canStartSession && (
+              <motion.p
+                className={styles.errorText}
+                initial={prefersReducedMotion ? {} : { opacity: 0, y: -10 }}
+                animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? {} : { opacity: 0 }}
+              >
+                Please name all 3 tasks to begin
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   // Running View
-  if (state === "running") {
+  if (focusBoxState === "running") {
     return (
-      <div className={`${styles.page} ${styles.running}`}>
+      <motion.div
+        className={`${styles.page} ${styles.running}`}
+        initial={prefersReducedMotion ? {} : { opacity: 0 }}
+        animate={prefersReducedMotion ? {} : { opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className={styles.runningContainer}>
-          <div className={styles.progressIndicator}>
+          <motion.div
+            className={styles.progressIndicator}
+            initial={prefersReducedMotion ? {} : { y: -20, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { y: 0, opacity: 1 }}
+          >
             {tasks.map((_, index) => (
-              <div
+              <motion.div
                 key={index}
                 className={`${styles.progressDot} ${index < currentTaskIndex ? styles.progressDotDone : ""} ${index === currentTaskIndex ? styles.progressDotActive : ""}`}
+                initial={prefersReducedMotion ? {} : { scale: 0 }}
+                animate={prefersReducedMotion ? {} : { scale: 1 }}
+                transition={{ delay: index * 0.1, ...springTransition }}
               >
                 {index < currentTaskIndex ? <Check size={14} /> : index + 1}
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          <h2 className={styles.currentTaskName}>{currentTask.name}</h2>
-          <p className={styles.taskCounter}>Task {currentTaskIndex + 1} of 3</p>
+          <motion.h2
+            className={styles.currentTaskName}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 10 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            {currentTask.name}
+          </motion.h2>
+          <motion.p
+            className={styles.taskCounter}
+            initial={prefersReducedMotion ? {} : { opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            Task {currentTaskIndex + 1} of 3
+          </motion.p>
 
-          <div className={styles.timerCircleWrapper}>
+          <motion.div
+            className={styles.timerCircleWrapper}
+            initial={prefersReducedMotion ? {} : { scale: 0.9, opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, ...springTransition }}
+          >
             <svg className={styles.timerRing} viewBox="0 0 200 200">
               <circle
                 cx="100"
@@ -248,7 +459,7 @@ export default function FocusBoxPage() {
                 stroke="rgba(197, 201, 164, 0.2)"
                 strokeWidth="8"
               />
-              <circle
+              <motion.circle
                 cx="100"
                 cy="100"
                 r="90"
@@ -266,93 +477,184 @@ export default function FocusBoxPage() {
             <div className={styles.timerCenter}>
               <span className={styles.timeDisplay}>{timer.formattedTime}</span>
             </div>
-          </div>
+          </motion.div>
 
-          {timer.pauseCount > 0 && (
-            <p className={styles.pauseCount}>{timer.pauseCount} pause{timer.pauseCount !== 1 ? 's' : ''}</p>
-          )}
+          <AnimatePresence>
+            {timer.pauseCount > 0 && (
+              <motion.p
+                className={styles.pauseCount}
+                initial={prefersReducedMotion ? {} : { opacity: 0, y: -10 }}
+                animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? {} : { opacity: 0 }}
+              >
+                {timer.pauseCount} pause{timer.pauseCount !== 1 ? 's' : ''}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
-          <div className={styles.controls}>
-            <button
+          <motion.div
+            className={styles.controls}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <motion.button
               className={`${styles.controlBtn} ${styles.controlBtnPrimary}`}
               onClick={timer.state === "running" ? timer.pause : timer.resume}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
             >
               {timer.state === "running" ? <Pause size={24} /> : <Play size={24} />}
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
               className={`${styles.controlBtn} ${styles.controlBtnGhost}`}
               onClick={endSessionEarly}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
             >
               <X size={20} />
               End Session
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   // Intermission View
-  if (state === "intermission") {
+  if (focusBoxState === "intermission") {
     const nextTask = tasks[currentTaskIndex + 1];
 
     return (
-      <div className={`${styles.page} ${styles.intermission}`}>
+      <motion.div
+        className={`${styles.page} ${styles.intermission}`}
+        initial={prefersReducedMotion ? {} : { opacity: 0 }}
+        animate={prefersReducedMotion ? {} : { opacity: 1 }}
+      >
         <div className={styles.runningContainer}>
-          <div className={styles.checkCircle}>
+          <motion.div
+            className={styles.checkCircle}
+            variants={prefersReducedMotion ? {} : celebrationBounce}
+            initial="hidden"
+            animate="visible"
+          >
             <Check size={48} />
-          </div>
+          </motion.div>
 
-          <h2>Task Complete!</h2>
-          <p className={styles.lastScore}>Focus Score: {results[results.length - 1]?.focusScore}%</p>
+          <motion.h2
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            Task Complete!
+          </motion.h2>
+          <motion.p
+            className={styles.lastScore}
+            initial={prefersReducedMotion ? {} : { opacity: 0 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            Focus Score: {results[results.length - 1]?.focusScore}%
+          </motion.p>
 
-          <div className={styles.nextTaskCard}>
+          <motion.div
+            className={styles.nextTaskCard}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, ...springTransition }}
+          >
             <span className={styles.label}>Up Next</span>
             <h3>{nextTask.name}</h3>
             <span className={styles.duration}>{nextTask.durationMinutes} minutes</span>
-          </div>
+          </motion.div>
 
-          <div className={styles.actions}>
-            <button className={styles.continueBtn} onClick={continueToNextTask}>
+          <motion.div
+            className={styles.actions}
+            initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+            animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <motion.button
+              className={styles.continueBtn}
+              onClick={continueToNextTask}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+              whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
+            >
               Continue
               <ChevronRight size={20} />
-            </button>
+            </motion.button>
 
-            <button className={styles.endBtn} onClick={resetSession}>
+            <motion.button
+              className={styles.endBtn}
+              onClick={resetSession}
+              whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+            >
               End Session
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   // Completed View
   return (
-    <div className={`${styles.page} ${styles.completed}`}>
+    <motion.div
+      className={`${styles.page} ${styles.completed}`}
+      initial={prefersReducedMotion ? {} : { opacity: 0 }}
+      animate={prefersReducedMotion ? {} : { opacity: 1 }}
+    >
       <div className={styles.container}>
-        <h2 className={styles.completedTitle}>Session Complete! 🎉</h2>
+        <motion.h2
+          className={styles.completedTitle}
+          variants={prefersReducedMotion ? {} : celebrationBounce}
+          initial="hidden"
+          animate="visible"
+        >
+          Session Complete! 🎉
+        </motion.h2>
 
-        <div className={styles.summaryStats}>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{Math.round(totalDuration / 60)}m</span>
+        <motion.div
+          className={styles.summaryStats}
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <motion.div
+            className={styles.stat}
+            whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
+          >
+            <span className={styles.statValue}>
+              {prefersReducedMotion ? Math.round(totalDuration / 60) : animatedDuration}m
+            </span>
             <span className={styles.statLabel}>Total Focus Time</span>
-          </div>
-          <div className={styles.stat}>
+          </motion.div>
+          <motion.div
+            className={styles.stat}
+            whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
+          >
             <span
               className={styles.statValue}
               style={{ color: getScoreColor(avgFocusScore) }}
             >
-              {avgFocusScore}%
+              {prefersReducedMotion ? avgFocusScore : animatedAvgScore}%
             </span>
             <span className={styles.statLabel}>Avg Focus Score</span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className={styles.resultsList}>
+        <motion.div
+          className={styles.resultsList}
+          variants={prefersReducedMotion ? {} : staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {results.map((result, index) => (
-            <div key={index} className={styles.resultCard}>
+            <motion.div
+              key={index}
+              className={styles.resultCard}
+              variants={prefersReducedMotion ? {} : staggerItem}
+              whileHover={prefersReducedMotion ? {} : { x: 4 }}
+            >
               <div className={styles.resultHeader}>
                 <span className={styles.taskName}>{result.taskName}</span>
                 <span
@@ -368,14 +670,60 @@ export default function FocusBoxPage() {
                   <span> • {result.pauseCount} pause{result.pauseCount !== 1 ? 's' : ''}</span>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
-        <button className={styles.newSessionBtn} onClick={resetSession}>
+        <motion.button
+          className={styles.newSessionBtn}
+          onClick={resetSession}
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+          whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
+        >
           New Session
-        </button>
+        </motion.button>
       </div>
-    </div>
+
+      {/* Guest Sign-in Prompt Modal */}
+      <AnimatePresence>
+        {showGuestPrompt && (
+          <motion.div
+            className={styles.modalOverlay}
+            onClick={() => setShowGuestPrompt(false)}
+            variants={prefersReducedMotion ? {} : modalOverlayVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <motion.div
+              className={styles.modal}
+              onClick={(e) => e.stopPropagation()}
+              variants={prefersReducedMotion ? {} : modalContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <h3>Session Saved Locally!</h3>
+              <p>Sign in to save your progress permanently and view analytics.</p>
+              <div className={styles.modalActions}>
+                <motion.button
+                  className={styles.btnGhost}
+                  onClick={() => setShowGuestPrompt(false)}
+                  whileTap={prefersReducedMotion ? {} : { scale: 0.97 }}
+                >
+                  Maybe Later
+                </motion.button>
+                <Link href="/auth/login" className={styles.btnAccent}>
+                  Sign In
+                </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

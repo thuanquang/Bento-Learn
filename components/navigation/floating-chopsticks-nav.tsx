@@ -4,9 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
     motion,
-    AnimatePresence,
     useMotionValue,
-    useTransform,
     animate,
 } from "framer-motion";
 import { BarChart3, Timer, Package, User } from "lucide-react";
@@ -217,55 +215,41 @@ export function FloatingChopsticksNav() {
                             className={styles.scrollMenu}
                             animate={{
                                 width: isOpen ? OPEN_WIDTH - 40 : 0,
-                                opacity: isOpen ? 1 : 0,
                             }}
                             transition={{
                                 duration: animDuration,
                                 ease: [0.4, 0, 0.2, 1],
                             }}
                         >
-                            <AnimatePresence mode="wait">
-                                {isOpen && (
-                                    <motion.div
-                                        className={styles.navItemsContainer}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: animDuration * 0.6, delay: animDuration * 0.3 }}
-                                    >
-                                        {navItems.map((item, index) => {
-                                            const isActive =
-                                                pathname === item.href ||
-                                                pathname.startsWith(item.href + "/");
+                            {/* Nav items always exist, just get revealed by the scroll width */}
+                            <div className={styles.navItemsContainer}>
+                                {navItems.map((item) => {
+                                    const isActive =
+                                        pathname === item.href ||
+                                        pathname.startsWith(item.href + "/");
 
-                                            return (
-                                                <motion.button
-                                                    key={item.href}
-                                                    className={`${styles.navItem} ${isActive ? styles.active : ""}`}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: -10 }}
-                                                    transition={{
-                                                        duration: animDuration * 0.4,
-                                                        delay: animDuration * 0.2 + index * 0.05,
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleNavClick(item.href);
-                                                    }}
-                                                    whileHover={prefersReducedMotion ? {} : { scale: 1.1 }}
-                                                    whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-                                                    title={item.label}
-                                                    aria-label={item.label}
-                                                    aria-current={isActive ? "page" : undefined}
-                                                >
-                                                    {item.icon}
-                                                </motion.button>
-                                            );
-                                        })}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                    return (
+                                        <motion.button
+                                            key={item.href}
+                                            className={`${styles.navItem} ${isActive ? styles.active : ""}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isOpen) {
+                                                    handleNavClick(item.href);
+                                                }
+                                            }}
+                                            whileHover={prefersReducedMotion || !isOpen ? {} : { scale: 1.1 }}
+                                            whileTap={prefersReducedMotion || !isOpen ? {} : { scale: 0.95 }}
+                                            title={item.label}
+                                            aria-label={item.label}
+                                            aria-current={isActive ? "page" : undefined}
+                                            tabIndex={isOpen ? 0 : -1}
+                                        >
+                                            {item.icon}
+                                        </motion.button>
+                                    );
+                                })}
+                            </div>
                         </motion.div>
                     </div>
 

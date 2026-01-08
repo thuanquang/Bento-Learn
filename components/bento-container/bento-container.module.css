@@ -260,6 +260,15 @@
     opacity: 1;
 }
 
+/* Lid animation wrapper - positions lid for slide animation */
+.lidWrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+}
+
+
 /* Loading state indicator */
 .loadingOverlay {
     position: absolute;

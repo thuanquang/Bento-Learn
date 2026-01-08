@@ -1,130 +1,120 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { usePathname } from "next/navigation";
-import { useBoxThemeOptional } from "@/lib/box-theme-context";
-import { getDefaultDesign } from "@/lib/box-designs";
+import React, { useEffect, useRef, useCallback } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useBoxTheme } from "@/lib/box-theme-context";
+import { useNavigationTransition } from "@/lib/navigation-transition-context";
 import styles from "./bento-container.module.css";
 
+// Animation timing constants
+const LID_CLOSE_DURATION = 0.3; // 300ms
+const LID_OPEN_DURATION = 0.3; // 300ms
+
 // ============================================
-// TYPES
+// COMPONENT
 // ============================================
 
 interface BentoBoxContainerProps {
     children: React.ReactNode;
 }
 
-// ============================================
-// COMPONENT
-// ============================================
-
-export const BentoBoxContainer: React.FC<BentoBoxContainerProps> = ({ children }) => {
-    const pathname = usePathname();
-    const prevPathname = useRef(pathname);
+export function BentoBoxContainer({ children }: BentoBoxContainerProps) {
     const prefersReducedMotion = useReducedMotion();
-    const isFirstRender = useRef(true);
+    const { selectedDesign } = useBoxTheme();
+    const { phase, onLidClosed, onLidOpened } = useNavigationTransition();
 
-    // Get box theme context (may be null if no provider)
-    const boxTheme = useBoxThemeOptional();
-    const selectedDesign = boxTheme?.selectedDesign || getDefaultDesign();
-
-    // Lid animation state: "hidden" | "closing" | "closed" | "opening"
-    const [lidState, setLidState] = useState<"hidden" | "closing" | "closed" | "opening">("hidden");
-
-    // Get the box and lid components
+    // Get box and lid components from selected design
     const BoxComponent = selectedDesign.BoxComponent;
     const LidComponent = selectedDesign.LidComponent;
 
+    // Track phase for callbacks
+    const phaseRef = useRef(phase);
+    phaseRef.current = phase;
+
     // ============================================
-    // NAVIGATION DETECTION & ANIMATION
+    // ANIMATION HANDLERS
     // ============================================
 
-    useEffect(() => {
-        // Skip animation on first render
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
+    const handleLidCloseComplete = useCallback(() => {
+        if (phaseRef.current === "closing") {
+            console.log('[BentoBox] Lid close animation complete');
+            onLidClosed();
         }
+    }, [onLidClosed]);
 
-        // Detect pathname change
-        if (pathname !== prevPathname.current) {
-            prevPathname.current = pathname;
-
-            if (prefersReducedMotion) {
-                // Skip animation for reduced motion preference
-                return;
-            }
-
-            // Start closing animation
-            setLidState("closing");
+    const handleLidOpenComplete = useCallback(() => {
+        if (phaseRef.current === "opening") {
+            console.log('[BentoBox] Lid open animation complete');
+            onLidOpened();
         }
-    }, [pathname, prefersReducedMotion]);
+    }, [onLidOpened]);
 
-    // Handle animation completion callbacks
-    const handleLidAnimationComplete = (definition: string) => {
-        if (definition === "closed") {
-            // Lid finished closing, now open it
-            setTimeout(() => {
-                setLidState("opening");
-            }, 100); // Brief pause before opening
-        } else if (definition === "hidden") {
-            // Lid finished opening (returned to hidden)
-            setLidState("hidden");
-        }
+    // ============================================
+    // LID ANIMATION VARIANTS
+    // ============================================
+
+    const lidVariants = {
+        hidden: {
+            y: "-100%",
+            opacity: 0,
+        },
+        visible: {
+            y: "0%",
+            opacity: 1,
+        },
     };
+
+    // Show lid during closing, navigating, and opening phases
+    const shouldShowLid = phase !== "idle";
+
+    // Animate to visible during closing/navigating, to hidden during opening
+    const lidAnimateState = phase === "opening" ? "hidden" : "visible";
 
     // ============================================
     // RENDER
     // ============================================
 
-    const showLid = lidState !== "hidden";
-
     return (
         <div className={styles.bentoContainer}>
             <div className={styles.bentoContainerInner}>
-                {/* The Bento Box */}
                 <BoxComponent>
-                    {/* Content - no AnimatePresence, lid handles transition */}
-                    {children}
+                    {/* Content Area - always shows current children */}
+                    {/* The navigation is delayed until lid is closed, so this always shows the right content */}
+                    <div style={{ height: "100%" }}>
+                        {children}
+                    </div>
                 </BoxComponent>
 
-                {/* The Lid (animated on navigation) */}
-                <AnimatePresence>
-                    {showLid && (
-                        <motion.div
-                            key="lid"
-                            initial={{ y: "-100%", opacity: 0 }}
-                            animate={
-                                lidState === "closing" || lidState === "closed"
-                                    ? { y: "0%", opacity: 1 }
-                                    : { y: "-100%", opacity: 0 }
+                {/* Lid Component with Animation */}
+                {shouldShowLid && (
+                    <motion.div
+                        key="bento-lid" // Stable key to prevent remount issues
+                        className={styles.lidWrapper}
+                        // Start visible if we're in navigating phase (lid is already closed)
+                        // Start hidden only during initial closing phase
+                        initial={phase === "closing" ? "hidden" : "visible"}
+                        animate={lidAnimateState}
+                        variants={lidVariants}
+                        transition={{
+                            duration: prefersReducedMotion ? 0 :
+                                (phase === "closing" ? LID_CLOSE_DURATION : LID_OPEN_DURATION),
+                            ease: "easeInOut",
+                        }}
+                        onAnimationComplete={(definition) => {
+                            console.log('[BentoBox] Animation complete:', definition, 'phase:', phaseRef.current);
+                            if (definition === "visible" && phaseRef.current === "closing") {
+                                handleLidCloseComplete();
+                            } else if (definition === "hidden" && phaseRef.current === "opening") {
+                                handleLidOpenComplete();
                             }
-                            exit={{ y: "-100%", opacity: 0 }}
-                            transition={{
-                                duration: 0.3,
-                                ease: lidState === "closing" ? "easeOut" : "easeIn"
-                            }}
-                            onAnimationComplete={() => {
-                                if (lidState === "closing") {
-                                    handleLidAnimationComplete("closed");
-                                } else if (lidState === "opening") {
-                                    handleLidAnimationComplete("hidden");
-                                }
-                            }}
-                            style={{
-                                position: "absolute",
-                                inset: 0,
-                                zIndex: 100,
-                            }}
-                        >
-                            <LidComponent />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                        }}
+                    >
+                        <LidComponent />
+                    </motion.div>
+                )}
             </div>
         </div>
     );
-};
+}
 
 export default BentoBoxContainer;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     motion,
     useMotionValue,
@@ -9,6 +9,7 @@ import {
 } from "framer-motion";
 import { BarChart3, Timer, Package, User } from "lucide-react";
 import { usePrefersReducedMotion } from "@/lib/motion";
+import { useNavigationTransition } from "@/lib/navigation-transition-context";
 import styles from "./floating-chopsticks-nav.module.css";
 
 interface NavItem {
@@ -57,7 +58,7 @@ export function FloatingChopsticksNav() {
     const y = useMotionValue(0);
 
     const pathname = usePathname();
-    const router = useRouter();
+    const { navigateWithTransition } = useNavigationTransition();
     const prefersReducedMotion = usePrefersReducedMotion();
 
     // Initialize position to bottom-right
@@ -125,9 +126,11 @@ export function FloatingChopsticksNav() {
     };
 
     const handleNavClick = (href: string) => {
-        router.push(href);
+        // Use the transition-aware navigation
+        navigateWithTransition(href);
         setIsOpen(false);
     };
+
 
     // Animation duration based on preference
     const animDuration = prefersReducedMotion ? 0 : 0.35;

@@ -40,6 +40,7 @@ export async function GET() {
                 longestStreak: stats.longestStreak,
                 defaultDuration: stats.defaultDuration,
                 defaultSound: stats.defaultSound,
+                selectedBoxDesign: stats.selectedBoxDesign,
             } : {
                 totalSessions: 0,
                 totalFocusMinutes: 0,
@@ -47,6 +48,7 @@ export async function GET() {
                 longestStreak: 0,
                 defaultDuration: 25,
                 defaultSound: "off",
+                selectedBoxDesign: "wooden-classic",
             },
         });
     } catch (error) {
@@ -82,12 +84,13 @@ export async function PATCH(request: NextRequest) {
         }
 
         // Update user settings
-        if (body.defaultDuration !== undefined || body.defaultSound !== undefined) {
+        if (body.defaultDuration !== undefined || body.defaultSound !== undefined || body.selectedBoxDesign !== undefined) {
             await prisma.userStats.update({
                 where: { userId },
                 data: {
                     ...(body.defaultDuration !== undefined && { defaultDuration: body.defaultDuration }),
                     ...(body.defaultSound !== undefined && { defaultSound: body.defaultSound }),
+                    ...(body.selectedBoxDesign !== undefined && { selectedBoxDesign: body.selectedBoxDesign }),
                 },
             });
         }

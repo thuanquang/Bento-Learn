@@ -1,0 +1,183 @@
+/* ============================================
+   BOX SELECTOR STYLES
+   Grid layout for selecting bento box designs
+   ============================================ */
+
+.boxSelectorContainer {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+.sectionTitle {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.sectionDescription {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+/* ============================================
+   DESIGN GRID
+   ============================================ */
+
+.designGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.designCard {
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    text-align: left;
+}
+
+.designCard:hover:not(.locked) {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.designCard.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.designCard.locked {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* ============================================
+   COLOR PREVIEW
+   ============================================ */
+
+.colorPreview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.selectedIndicator {
+    width: 36px;
+    height: 36px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.lockOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+/* ============================================
+   DESIGN INFO
+   ============================================ */
+
+.designInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.designName {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.unlockHint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.selectHint {
+    font-size: 0.75rem;
+    color: var(--primary);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.designCard:hover .selectHint {
+    opacity: 1;
+}
+
+.activeLabel {
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+/* ============================================
+   SAVING INDICATOR
+   ============================================ */
+
+.savingIndicator {
+    margin-top: 12px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 767px) {
+    .boxSelectorContainer {
+        padding: 16px;
+    }
+
+    .designGrid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .designCard {
+        padding: 10px;
+    }
+}

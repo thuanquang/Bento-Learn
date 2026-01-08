@@ -1,0 +1,298 @@
+/* ============================================
+   BENTO BOX CONTAINER STYLES
+   Base styles for bento box designs
+   ============================================ */
+
+/* ============================================
+   CSS VARIABLES
+   ============================================ */
+:root {
+    /* Wooden box colors */
+    --bento-wood-light: #D4A574;
+    --bento-wood-medium: #B8860B;
+    --bento-wood-dark: #8B7355;
+    --bento-wood-grain: rgba(139, 69, 19, 0.1);
+    --bento-wood-shadow: rgba(101, 67, 33, 0.3);
+
+    /* Box dimensions - reduced for tighter fit */
+    --bento-border-radius: 12px;
+    --bento-border-width: 6px;
+    --bento-padding: 16px;
+    --bento-shadow: 0 6px 24px rgba(0, 0, 0, 0.12),
+        0 3px 12px rgba(139, 69, 19, 0.08);
+
+    /* Lid dimensions */
+    --lid-height: 100%;
+    --lid-edge-height: 6px;
+}
+
+/* ============================================
+   WOODEN BOX STYLES
+   ============================================ */
+.woodenBox {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(145deg,
+            var(--bento-wood-light) 0%,
+            var(--bento-wood-medium) 50%,
+            var(--bento-wood-dark) 100%);
+    border-radius: var(--bento-border-radius);
+    border: var(--bento-border-width) solid var(--bento-wood-dark);
+    box-shadow: var(--bento-shadow);
+    overflow: hidden;
+}
+
+.woodenBoxInner {
+    position: relative;
+    flex: 1;
+    z-index: 1;
+    background: var(--background);
+    border-radius: calc(var(--bento-border-radius) - var(--bento-border-width));
+    padding: var(--bento-padding);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Wood grain texture overlay */
+.woodGrainOverlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.15;
+    background-image:
+        repeating-linear-gradient(90deg,
+            transparent,
+            transparent 2px,
+            var(--bento-wood-grain) 2px,
+            var(--bento-wood-grain) 4px),
+        repeating-linear-gradient(0deg,
+            transparent,
+            transparent 20px,
+            var(--bento-wood-grain) 20px,
+            var(--bento-wood-grain) 22px);
+    border-radius: inherit;
+    z-index: 0;
+}
+
+/* Corner details for authentic bento look */
+.boxCorner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: var(--bento-wood-dark);
+    z-index: 2;
+}
+
+.boxCorner[data-position="top-left"] {
+    top: 0;
+    left: 0;
+    border-bottom-right-radius: 12px;
+}
+
+.boxCorner[data-position="top-right"] {
+    top: 0;
+    right: 0;
+    border-bottom-left-radius: 12px;
+}
+
+.boxCorner[data-position="bottom-left"] {
+    bottom: 0;
+    left: 0;
+    border-top-right-radius: 12px;
+}
+
+.boxCorner[data-position="bottom-right"] {
+    bottom: 0;
+    right: 0;
+    border-top-left-radius: 12px;
+}
+
+/* ============================================
+   WOODEN LID STYLES
+   ============================================ */
+.woodenLid {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    border-radius: var(--bento-border-radius);
+    overflow: hidden;
+}
+
+.lidSurface {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(145deg,
+            var(--bento-wood-light) 0%,
+            var(--bento-wood-medium) 30%,
+            var(--bento-wood-dark) 100%);
+    border-radius: var(--bento-border-radius);
+    border: var(--bento-border-width) solid var(--bento-wood-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Lid handle/grip */
+.lidHandle {
+    width: 80px;
+    height: 24px;
+    background: var(--bento-wood-dark);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.2),
+        0 2px 8px var(--bento-wood-shadow);
+}
+
+.lidHandleInner {
+    width: 60px;
+    height: 8px;
+    background: linear-gradient(90deg,
+            var(--bento-wood-medium),
+            var(--bento-wood-light),
+            var(--bento-wood-medium));
+    border-radius: 4px;
+}
+
+/* Lid edge shadow for depth */
+.lidEdge {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--lid-edge-height);
+    background: linear-gradient(to bottom,
+            transparent,
+            var(--bento-wood-shadow));
+    border-radius: 0 0 var(--bento-border-radius) var(--bento-border-radius);
+}
+
+/* ============================================
+   BENTO CONTAINER WRAPPER
+   ============================================ */
+.bentoContainer {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    /* Fixed dimensions matching Timer page */
+    width: 400px;
+    height: 580px;
+    max-width: calc(100vw - 32px);
+}
+
+.bentoContainerInner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+/* Desktop - slightly larger */
+@media (min-width: 1024px) {
+    .bentoContainer {
+        width: 440px;
+        height: 620px;
+    }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+    :root {
+        --bento-padding: 14px;
+        --bento-border-width: 5px;
+    }
+
+    .bentoContainer {
+        width: 420px;
+        height: 600px;
+    }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+    :root {
+        --bento-padding: 12px;
+        --bento-border-width: 4px;
+        --bento-border-radius: 10px;
+    }
+
+    .bentoContainer {
+        width: 100%;
+        height: 480px;
+        max-width: calc(100vw - 16px);
+    }
+
+    .boxCorner {
+        width: 14px;
+        height: 14px;
+    }
+
+    .lidHandle {
+        width: 50px;
+        height: 16px;
+    }
+
+    .lidHandleInner {
+        width: 36px;
+        height: 5px;
+    }
+}
+
+/* ============================================
+   ANIMATION STATES
+   ============================================ */
+.lidHidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.lidVisible {
+    opacity: 1;
+}
+
+/* Loading state indicator */
+.loadingOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background);
+    z-index: 50;
+}
+
+.loadingSpinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bento-wood-light);
+    border-top-color: var(--bento-wood-dark);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+    .loadingSpinner {
+        animation: none;
+        border-top-color: var(--bento-wood-light);
+        opacity: 0.5;
+    }
+}

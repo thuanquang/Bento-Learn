@@ -122,6 +122,7 @@ model UserStats {
   // Preferences
   defaultDuration      Int      @default(25) // in minutes
   defaultSound         String   @default("off")
+  selectedBoxDesign    String   @default("wooden-classic") // Bento box design ID
   
   updatedAt            DateTime @updatedAt
 }

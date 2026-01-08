@@ -22,6 +22,7 @@ import {
   usePrefersReducedMotion
 } from "@/lib/motion";
 import { useAuth } from "@/lib/auth-context";
+import { BoxSelector } from "@/components/bento-container";
 import styles from "./profile.module.css";
 
 interface UserData {
@@ -379,12 +380,21 @@ export default function ProfilePage() {
           </motion.div>
         </motion.div>
 
+        {/* Bento Box Style Selector */}
+        <motion.div
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <BoxSelector />
+        </motion.div>
+
         {/* Logout Button */}
         <motion.div
           className={styles.section}
           initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
           animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
+          transition={{ delay: 0.5 }}
         >
           <motion.button
             className={styles.logoutBtn}

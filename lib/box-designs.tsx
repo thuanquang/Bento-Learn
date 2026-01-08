@@ -36,6 +36,16 @@ export interface BentoBoxDesign {
     colorPalette?: ThemeColors;
     // Preview image/icon for the selector
     previewColor: string;
+    // Optional SFX file paths for navigation sounds
+    sfxPaths?: {
+        open: string;   // Path to opening SFX (relative to public/)
+        close: string;  // Path to closing SFX (relative to public/)
+    };
+    // Optional SFX timing configuration
+    sfxTiming?: {
+        openTrigger: 'start' | 'end';   // When to play opening SFX
+        closeTrigger: 'start' | 'end';  // When to play closing SFX
+    };
 }
 
 // ============================================
@@ -73,6 +83,18 @@ export const BOX_DESIGNS: BentoBoxDesign[] = [
             background: "#F5F5DC",
             surface: "#FAEBD7",
             text: "#4A3728",
+        },
+        // SFX paths - replace with actual audio files
+        sfxPaths: {
+            open: "/sounds/sfx/wooden-classic/open.mp3",
+            close: "/sounds/sfx/wooden-classic/close.mp3",
+        },
+        // SFX timing for wooden box:
+        // - Opening: play when lid starts opening
+        // - Closing: play when lid finishes closing (hits the box wall)
+        sfxTiming: {
+            openTrigger: 'start',
+            closeTrigger: 'end',
         },
     },
     {

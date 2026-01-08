@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 // ============================================
 // NAVIGATION TRANSITION CONTEXT
 // Coordinates lid animations with page navigation
+// Also tracks dwell time for velocity-based SFX
 // ============================================
 
 type AnimationPhase = "idle" | "closing" | "navigating" | "opening";
@@ -16,6 +17,8 @@ interface NavigationTransitionContextType {
     onLidClosed: () => void;
     onLidOpened: () => void;
     pendingPath: string | null;
+    /** Time in ms the user spent on the previous page (for SFX velocity) */
+    lastDwellTimeMs: number;
 }
 
 const NavigationTransitionContext = createContext<NavigationTransitionContextType | null>(null);
@@ -27,6 +30,10 @@ export function NavigationTransitionProvider({ children }: { children: ReactNode
     const [phase, setPhase] = useState<AnimationPhase>("idle");
     const [pendingPath, setPendingPath] = useState<string | null>(null);
 
+    // Dwell time tracking for velocity-based SFX
+    const [lastDwellTimeMs, setLastDwellTimeMs] = useState<number>(0);
+    const pageArrivalTimeRef = useRef<number>(Date.now());
+
     // Queue for handling rapid navigations
     const navigationQueueRef = useRef<string[]>([]);
 
@@ -37,6 +44,11 @@ export function NavigationTransitionProvider({ children }: { children: ReactNode
         console.log('[NavTransition] Navigate requested:', href, 'current phase:', phase);
 
         if (phase === "idle") {
+            // Calculate dwell time for velocity-based SFX
+            const dwellTime = Date.now() - pageArrivalTimeRef.current;
+            setLastDwellTimeMs(dwellTime);
+            console.log('[NavTransition] Dwell time:', dwellTime, 'ms');
+
             // Start the closing animation
             setPendingPath(href);
             setPhase("closing");
@@ -63,9 +75,16 @@ export function NavigationTransitionProvider({ children }: { children: ReactNode
     const onLidOpened = useCallback(() => {
         console.log('[NavTransition] Lid opened');
 
+        // Reset page arrival time for next dwell calculation
+        pageArrivalTimeRef.current = Date.now();
+
         // Check if there are queued navigations
         if (navigationQueueRef.current.length > 0) {
             const nextPath = navigationQueueRef.current.shift()!;
+            // Calculate dwell time for queued navigation (will be very short)
+            const dwellTime = 0; // Just arrived, so dwell is 0
+            setLastDwellTimeMs(dwellTime);
+
             setPendingPath(nextPath);
             setPhase("closing");
             console.log('[NavTransition] Processing queued navigation:', nextPath);
@@ -91,6 +110,7 @@ export function NavigationTransitionProvider({ children }: { children: ReactNode
                 onLidClosed,
                 onLidOpened,
                 pendingPath,
+                lastDwellTimeMs,
             }}
         >
             {children}

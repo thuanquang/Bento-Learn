@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useBoxTheme } from "@/lib/box-theme-context";
 import { useNavigationTransition } from "@/lib/navigation-transition-context";
+import { useSfxPlayer } from "@/lib/use-sfx-player";
 import styles from "./bento-container.module.css";
 
 // Animation timing constants
@@ -21,7 +22,8 @@ interface BentoBoxContainerProps {
 export function BentoBoxContainer({ children }: BentoBoxContainerProps) {
     const prefersReducedMotion = useReducedMotion();
     const { selectedDesign } = useBoxTheme();
-    const { phase, onLidClosed, onLidOpened } = useNavigationTransition();
+    const { phase, onLidClosed, onLidOpened, lastDwellTimeMs } = useNavigationTransition();
+    const { playOpenSfx, playCloseSfx, hasSfx, sfxTiming } = useSfxPlayer();
 
     // Get box and lid components from selected design
     const BoxComponent = selectedDesign.BoxComponent;
@@ -31,6 +33,33 @@ export function BentoBoxContainer({ children }: BentoBoxContainerProps) {
     const phaseRef = useRef(phase);
     phaseRef.current = phase;
 
+    // Track previous phase to detect transitions
+    const prevPhaseRef = useRef(phase);
+
+    // Store dwell time ref for use in callbacks
+    const dwellTimeRef = useRef(lastDwellTimeMs);
+    dwellTimeRef.current = lastDwellTimeMs;
+
+    // ============================================
+    // SFX TRIGGERS
+    // ============================================
+
+    // Play opening SFX when phase transitions to "opening" (if trigger is 'start')
+    useEffect(() => {
+        if (hasSfx && sfxTiming.openTrigger === 'start') {
+            if (prevPhaseRef.current !== 'opening' && phase === 'opening') {
+                playOpenSfx(dwellTimeRef.current);
+            }
+        }
+        // Play closing SFX when phase transitions to "closing" (if trigger is 'start')
+        if (hasSfx && sfxTiming.closeTrigger === 'start') {
+            if (prevPhaseRef.current !== 'closing' && phase === 'closing') {
+                playCloseSfx(dwellTimeRef.current);
+            }
+        }
+        prevPhaseRef.current = phase;
+    }, [phase, hasSfx, sfxTiming, playOpenSfx, playCloseSfx]);
+
     // ============================================
     // ANIMATION HANDLERS
     // ============================================
@@ -38,16 +67,28 @@ export function BentoBoxContainer({ children }: BentoBoxContainerProps) {
     const handleLidCloseComplete = useCallback(() => {
         if (phaseRef.current === "closing") {
             console.log('[BentoBox] Lid close animation complete');
+
+            // Play closing SFX if trigger is 'end'
+            if (hasSfx && sfxTiming.closeTrigger === 'end') {
+                playCloseSfx(dwellTimeRef.current);
+            }
+
             onLidClosed();
         }
-    }, [onLidClosed]);
+    }, [onLidClosed, hasSfx, sfxTiming.closeTrigger, playCloseSfx]);
 
     const handleLidOpenComplete = useCallback(() => {
         if (phaseRef.current === "opening") {
             console.log('[BentoBox] Lid open animation complete');
+
+            // Play opening SFX if trigger is 'end'
+            if (hasSfx && sfxTiming.openTrigger === 'end') {
+                playOpenSfx(dwellTimeRef.current);
+            }
+
             onLidOpened();
         }
-    }, [onLidOpened]);
+    }, [onLidOpened, hasSfx, sfxTiming.openTrigger, playOpenSfx]);
 
     // ============================================
     // LID ANIMATION VARIANTS
